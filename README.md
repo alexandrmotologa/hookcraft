@@ -1,11 +1,23 @@
-# HookCraft
+<p align="center">
+  <img src="docs/images/logo.png?raw=true" alt="HookCraft Logo" width="130" style="border-radius: 24px;" />
+</p>
 
-Ultra-Fast Zero-Dependency Git Hook Orchestrator and Staged Secret Leak Shield in Go.
-Alternative to Husky, Python pre-commit, and Lefthook in a single binary (< 15MB RAM).
+<h1 align="center">HookCraft</h1>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Go Version](https://img.shields.io/badge/Go-1.23+-00ADD8?logo=go)](https://go.dev/)
-[![React 19](https://img.shields.io/badge/React-19.0-61DAFB?logo=react)](https://react.dev/)
+<p align="center">
+  <strong>Ultra-Fast Zero-Dependency Git Hook Orchestrator and Staged Secret Leak Shield in Go.</strong><br>
+  A single native binary alternative to Husky, Python pre-commit, and Lefthook (&lt; 15MB RAM).
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
+  <a href="https://go.dev/"><img src="https://img.shields.io/badge/Go-1.23+-00ADD8?logo=go" alt="Go Version"></a>
+  <a href="https://react.dev/"><img src="https://img.shields.io/badge/React-19.0-61DAFB?logo=react" alt="React 19"></a>
+</p>
+
+<p align="center">
+  <img src="docs/images/hookcraft_demo.gif" alt="HookCraft Animated Demo" width="920" style="border-radius: 12px; box-shadow: 0 20px 40px rgba(0,0,0,0.5);" />
+</p>
 
 ---
 
@@ -146,7 +158,7 @@ See [docs/SECRET_SHIELD.md](docs/SECRET_SHIELD.md) for full detection specificat
 
 ## HookCraft Studio
 
-HookCraft includes an embedded web dashboard for inspecting execution performance waterfalls, historical commit timings, and staged secret audits.
+HookCraft includes an embedded web dashboard for inspecting execution performance waterfalls, historical commit timings, staged secret audits, and configuration state.
 
 Launch the studio:
 
@@ -154,7 +166,40 @@ Launch the studio:
 hookcraft studio --port 4173
 ```
 
-Open `http://localhost:4173` in your browser. The dashboard is embedded directly into the Go binary and requires no external web server.
+Open `http://localhost:4173` in your browser. The dashboard is embedded directly into the Go binary (`//go:embed all:dist`) and requires no external Node.js or web server.
+
+### Execution Performance Waterfall
+
+Inspect step durations, worker concurrency, and memory consumption in real time:
+
+<p align="center">
+  <img src="docs/images/hookcraft_waterfall.png" alt="HookCraft Waterfall Benchmark" width="920" style="border-radius: 10px; border: 1px solid #1f293d;" />
+</p>
+
+### Staged Secret Leak Shield and Diff Inspector
+
+Review flagged tokens, line numbers, and colorized diff hunks:
+
+<p align="center">
+  <img src="docs/images/hookcraft_shield.png" alt="HookCraft Secret Shield View" width="920" style="border-radius: 10px; border: 1px solid #1f293d;" />
+</p>
+
+### Staged Diffs Browser and Multi-Device Responsiveness
+
+Review staged code modifications and manage hooks across desktop, tablet, and mobile devices:
+
+<p align="center">
+  <img src="docs/images/hookcraft_diff.png" alt="HookCraft Staged Diffs Browser" width="600" style="border-radius: 10px; border: 1px solid #1f293d; vertical-align: top; margin-right: 12px;" />
+  <img src="docs/images/hookcraft_mobile.png" alt="HookCraft Mobile Studio" width="280" style="border-radius: 10px; border: 1px solid #1f293d; vertical-align: top;" />
+</p>
+
+### Terminal Execution
+
+Run Git hooks directly in your command line with sub-100ms response times:
+
+<p align="center">
+  <img src="docs/images/hookcraft_terminal.png" alt="HookCraft Terminal Run" width="920" style="border-radius: 10px; border: 1px solid #1f293d;" />
+</p>
 
 ---
 

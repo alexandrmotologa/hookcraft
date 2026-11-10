@@ -11,7 +11,7 @@ interface StagedDiffViewProps {
 export const StagedDiffView: React.FC<StagedDiffViewProps> = ({ diffData, onStageFiles, staging }) => {
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
 
-  if (!diffData || diffData.hunks.length === 0) {
+  if (!diffData || !diffData.hunks || diffData.hunks.length === 0) {
     return (
       <div className="p-12 rounded-xl bg-[#111827] border border-[#1f293d] text-center">
         <div className="w-12 h-12 rounded-full bg-slate-800/60 border border-slate-700/60 flex items-center justify-center text-slate-400 mx-auto mb-3">
@@ -25,10 +25,12 @@ export const StagedDiffView: React.FC<StagedDiffViewProps> = ({ diffData, onStag
     );
   }
 
-  const hunks = diffData.hunks;
+  const hunks = diffData.hunks || [];
   const activeHunk = selectedFile
     ? hunks.find((h) => h.FilePath === selectedFile) || hunks[0]
     : hunks[0];
+
+  const addedLines = activeHunk?.AddedLines || [];
 
   return (
     <div className="space-y-3">
@@ -91,17 +93,17 @@ export const StagedDiffView: React.FC<StagedDiffViewProps> = ({ diffData, onStag
             )}
           </div>
           <span className="text-xs font-mono text-slate-400">
-            {activeHunk.AddedLines.length} added lines
+            {addedLines.length} added lines
           </span>
         </div>
 
         <div className="p-4 font-mono text-xs overflow-x-auto bg-[#090d16] space-y-0.5">
-          {activeHunk.AddedLines.length === 0 ? (
+          {addedLines.length === 0 ? (
             <div className="py-6 text-center text-slate-500 italic">
               No added lines in hunk.
             </div>
           ) : (
-            activeHunk.AddedLines.map((line, idx) => (
+            addedLines.map((line, idx) => (
               <div
                 key={idx}
                 className="flex items-start hover:bg-slate-800/40 py-0.5 px-2 rounded group"

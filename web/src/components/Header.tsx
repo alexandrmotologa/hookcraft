@@ -45,21 +45,21 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Navigation Tabs */}
-        <nav className="flex items-center space-x-1 bg-[#111827] p-1 rounded-xl border border-[#1f293d]">
+        <nav className="flex items-center space-x-1 bg-[#111827] p-1 rounded-xl border border-[#1f293d] overflow-x-auto max-w-full">
           <button
             onClick={() => setActiveTab('overview')}
-            className={`flex items-center space-x-2 px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
+            className={`flex items-center space-x-2 px-3 py-1.5 text-xs font-medium rounded-lg transition-all shrink-0 ${
               activeTab === 'overview'
                 ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 shadow-sm'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
             }`}
           >
             <Activity className="w-3.5 h-3.5" />
-            <span>Overview & Benchmark</span>
+            <span><span className="hidden sm:inline">Overview & </span>Benchmark</span>
           </button>
           <button
             onClick={() => setActiveTab('secrets')}
-            className={`flex items-center space-x-2 px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
+            className={`flex items-center space-x-2 px-3 py-1.5 text-xs font-medium rounded-lg transition-all shrink-0 ${
               activeTab === 'secrets'
                 ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 shadow-sm'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
@@ -70,7 +70,7 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
           <button
             onClick={() => setActiveTab('diff')}
-            className={`flex items-center space-x-2 px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
+            className={`flex items-center space-x-2 px-3 py-1.5 text-xs font-medium rounded-lg transition-all shrink-0 ${
               activeTab === 'diff'
                 ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 shadow-sm'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
@@ -86,7 +86,7 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
           <button
             onClick={() => setActiveTab('config')}
-            className={`flex items-center space-x-2 px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
+            className={`flex items-center space-x-2 px-3 py-1.5 text-xs font-medium rounded-lg transition-all shrink-0 ${
               activeTab === 'config'
                 ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 shadow-sm'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
