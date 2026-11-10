@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"embed"
 	"encoding/json"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/alexandrmotologa/hookcraft/internal/cache"
 	"github.com/alexandrmotologa/hookcraft/internal/config"
 	"github.com/alexandrmotologa/hookcraft/internal/git"
 	"github.com/alexandrmotologa/hookcraft/internal/runner"
@@ -64,6 +66,9 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/api/diff", s.handleDiff)
 	mux.HandleFunc("/api/config", s.handleConfig)
 	mux.HandleFunc("/api/scan", s.handleScan)
+	mux.HandleFunc("/api/run", s.handleRun)
+	mux.HandleFunc("/api/stage", s.handleStage)
+	mux.HandleFunc("/api/cache/clean", s.handleCacheClean)
 
 	// Static web assets handler (with SPA fallback)
 	s.setupStaticAssets(mux)
@@ -153,6 +158,7 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 	}
 
 	scanner := secrets.NewScanner(s.Config.Settings.EntropyThreshold)
+	scanner.SetIgnorePatterns(secrets.LoadIgnorePatterns(s.RepoRoot))
 	findings := scanner.ScanHunks(hunks)
 
 	resp := map[string]interface{}{
@@ -162,6 +168,80 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 		"rules_count": len(scanner.Rules),
 	}
 	writeJSON(w, http.StatusOK, resp)
+}
+
+func (s *Server) handleRun(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		HookName string `json:"hook_name"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+	if req.HookName == "" {
+		req.HookName = "pre-commit"
+	}
+
+	engine := runner.NewEngine(s.Config, s.GitRunner)
+	summary, err := engine.Run(context.Background(), req.HookName, nil)
+	if summary == nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("execution failed: %v", err))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, summary)
+}
+
+func (s *Server) handleStage(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Files []string `json:"files"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+
+	targetFiles := req.Files
+	if len(targetFiles) == 0 {
+		staged, _ := s.GitRunner.GetStagedFiles()
+		modified, _ := s.GitRunner.GetModifiedStagedFiles(staged)
+		targetFiles = modified
+	}
+
+	if len(targetFiles) > 0 {
+		if err := s.GitRunner.StageFiles(targetFiles...); err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"success": true,
+		"staged":  targetFiles,
+		"count":   len(targetFiles),
+	})
+}
+
+func (s *Server) handleCacheClean(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	cacheMgr := cache.NewManager(s.RepoRoot)
+	if err := cacheMgr.Clean(); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"success": true,
+		"message": "Cache cleaned successfully",
+	})
 }
 
 func (s *Server) setupStaticAssets(mux *http.ServeMux) {
@@ -236,11 +316,11 @@ func (s *Server) serveFallbackHTML(w http.ResponseWriter) {
   <div class="card">
     <h3>Available REST API Endpoints:</h3>
     <ul>
-      <li><a href="/api/status" style="color: #38bdf8">/api/status</a> — Repository health and hook installation status</li>
-      <li><a href="/api/history" style="color: #38bdf8">/api/history</a> — Historical benchmark runs and execution timings</li>
-      <li><a href="/api/diff" style="color: #38bdf8">/api/diff</a> — Staged diff hunks</li>
-      <li><a href="/api/config" style="color: #38bdf8">/api/config</a> — Active HookCraft configuration</li>
-      <li><a href="/api/scan" style="color: #38bdf8">/api/scan</a> — Real-time secret leak audit</li>
+      <li><a href="/api/status" style="color: #38bdf8">/api/status</a>: Repository health and hook installation status</li>
+      <li><a href="/api/history" style="color: #38bdf8">/api/history</a>: Historical benchmark runs and execution timings</li>
+      <li><a href="/api/diff" style="color: #38bdf8">/api/diff</a>: Staged diff hunks</li>
+      <li><a href="/api/config" style="color: #38bdf8">/api/config</a>: Active HookCraft configuration</li>
+      <li><a href="/api/scan" style="color: #38bdf8">/api/scan</a>: Real-time secret leak audit</li>
     </ul>
   </div>
 </body>

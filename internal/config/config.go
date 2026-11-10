@@ -28,19 +28,26 @@ type Settings struct {
 	TimeoutSeconds      int     `yaml:"timeout_seconds"`
 	StashUnstaged       bool    `yaml:"stash_unstaged"`
 	FailFast            bool    `yaml:"fail_fast"`
+	MaxFileSizeMB       float64 `yaml:"max_file_size_mb"`
+	EnableCache         bool    `yaml:"enable_cache"`
 }
 
 // HookStep defines an individual hook step execution.
 type HookStep struct {
-	Name           string   `yaml:"name"`
-	Type           string   `yaml:"type"`            // "command" (default), "builtin:secret_shield", "builtin:conventional_commits"
-	Glob           string   `yaml:"glob"`            // e.g. "*.{ts,tsx,js}", "*.go"
-	ExcludeGlob    string   `yaml:"exclude_glob"`    // optional exclusion pattern
-	Run            string   `yaml:"run"`             // command string with {staged_files}
-	StageFixed     bool     `yaml:"stage_fixed"`     // auto-stage modified files
-	Action         string   `yaml:"action"`          // "block" (default) or "warn"
-	TimeoutSeconds int      `yaml:"timeout_seconds"` // step-specific timeout
-	Env            []string `yaml:"env"`             // custom environment variables KEY=VALUE
+	Name              string   `yaml:"name"`
+	Type              string   `yaml:"type"`               // "command", "builtin:secret_shield", "builtin:file_size_shield", "builtin:branch_protection", "builtin:conventional_commits"
+	Glob              string   `yaml:"glob"`               // e.g. "*.{ts,tsx,js}", "*.go"
+	ExcludeGlob       string   `yaml:"exclude_glob"`       // optional exclusion pattern
+	Run               string   `yaml:"run"`                // command string with {staged_files}
+	StageFixed        bool     `yaml:"stage_fixed"`        // auto-stage modified files
+	Action            string   `yaml:"action"`             // "block" (default) or "warn"
+	TimeoutSeconds    int      `yaml:"timeout_seconds"`    // step-specific timeout
+	Env               []string `yaml:"env"`                // custom environment variables KEY=VALUE
+	MaxFileSizeMB     float64  `yaml:"max_file_size_mb"`   // for builtin:file_size_shield
+	ProtectedBranches []string `yaml:"protected_branches"` // for builtin:branch_protection
+	AllowTags         bool     `yaml:"allow_tags"`         // for builtin:branch_protection
+	RequireTicket     bool     `yaml:"require_ticket"`     // for builtin:conventional_commits
+	TicketPattern     string   `yaml:"ticket_pattern"`     // regex for JIRA/GitHub issue ticket e.g. "PROJ-[0-9]+"
 }
 
 // Standard configuration filenames.
@@ -63,6 +70,8 @@ func DefaultSettings() Settings {
 		TimeoutSeconds:      30,
 		StashUnstaged:       true,
 		FailFast:            false,
+		MaxFileSizeMB:       5.0,
+		EnableCache:         true,
 	}
 }
 

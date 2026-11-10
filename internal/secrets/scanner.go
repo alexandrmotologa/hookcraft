@@ -22,6 +22,7 @@ type Finding struct {
 type Scanner struct {
 	EntropyThreshold float64
 	Rules            []Rule
+	IgnorePatterns   []string
 }
 
 // NewScanner creates a new Scanner with given entropy threshold.
@@ -32,7 +33,13 @@ func NewScanner(threshold float64) *Scanner {
 	return &Scanner{
 		EntropyThreshold: threshold,
 		Rules:            SecretRules,
+		IgnorePatterns:   nil,
 	}
+}
+
+// SetIgnorePatterns configures custom ignore rules from .hookcraftignore.
+func (s *Scanner) SetIgnorePatterns(patterns []string) {
+	s.IgnorePatterns = patterns
 }
 
 // ScanHunks analyzes staged diff hunks, checking only added lines for secrets.
@@ -40,7 +47,7 @@ func (s *Scanner) ScanHunks(hunks []git.FileHunk) []Finding {
 	var findings []Finding
 
 	for _, hunk := range hunks {
-		if IsPathExcluded(hunk.FilePath) {
+		if IsPathExcludedWithIgnore(hunk.FilePath, s.IgnorePatterns) {
 			continue
 		}
 
@@ -60,7 +67,7 @@ func (s *Scanner) ScanHunks(hunks []git.FileHunk) []Finding {
 
 // ScanText analyzes raw text content line by line (used for whole file scanning).
 func (s *Scanner) ScanText(content string, filePath string) []Finding {
-	if IsPathExcluded(filePath) {
+	if IsPathExcludedWithIgnore(filePath, s.IgnorePatterns) {
 		return nil
 	}
 

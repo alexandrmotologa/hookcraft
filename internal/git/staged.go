@@ -2,6 +2,8 @@ package git
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -236,4 +238,26 @@ func (r *Runner) HasUnstagedChanges() (bool, error) {
 		}
 	}
 	return false, nil
+}
+
+// GetStagedFileSizes returns the size in bytes of each staged file blob.
+func (r *Runner) GetStagedFileSizes(stagedFiles []string) (map[string]int64, error) {
+	sizes := make(map[string]int64, len(stagedFiles))
+	for _, f := range stagedFiles {
+		// Use git cat-file -s :<path> to get staged blob size
+		out, err := r.Exec("cat-file", "-s", ":"+f)
+		if err == nil {
+			trimmed := strings.TrimSpace(out)
+			if s, err := strconv.ParseInt(trimmed, 10, 64); err == nil {
+				sizes[f] = s
+				continue
+			}
+		}
+		// Fallback to disk if cat-file fails (e.g. for untracked newly added)
+		fullPath := filepath.Join(r.RepoRoot, f)
+		if info, err := os.Stat(fullPath); err == nil {
+			sizes[f] = info.Size()
+		}
+	}
+	return sizes, nil
 }

@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { Terminal, Copy, Check, Sliders, Shield, Zap } from 'lucide-react';
+import { Terminal, Copy, Check, Sliders, Shield, Zap, Trash2 } from 'lucide-react';
 import { ConfigResponse } from '../types';
 
 interface ConfigEditorProps {
   configData: ConfigResponse | null;
+  onClearCache?: () => Promise<void>;
+  clearingCache?: boolean;
 }
 
-export const ConfigEditor: React.FC<ConfigEditorProps> = ({ configData }) => {
+export const ConfigEditor: React.FC<ConfigEditorProps> = ({ configData, onClearCache, clearingCache }) => {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
@@ -77,13 +79,27 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = ({ configData }) => {
             </span>
           </div>
 
-          <button
-            onClick={handleCopy}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-[#0c1220] border border-[#1f293d] hover:border-slate-600 text-xs text-slate-300 transition-all"
-          >
-            {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-            <span>{copied ? 'Copied' : 'Copy YAML'}</span>
-          </button>
+          <div className="flex items-center space-x-2">
+            {onClearCache && (
+              <button
+                onClick={onClearCache}
+                disabled={clearingCache}
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-[#0c1220] border border-[#1f293d] hover:border-rose-800/60 hover:text-rose-400 text-xs text-slate-400 transition-all disabled:opacity-50"
+                title="Purge content-addressable execution cache"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{clearingCache ? 'Cleaning...' : 'Clear Cache'}</span>
+              </button>
+            )}
+
+            <button
+              onClick={handleCopy}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-[#0c1220] border border-[#1f293d] hover:border-slate-600 text-xs text-slate-300 transition-all"
+            >
+              {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+              <span>{copied ? 'Copied' : 'Copy YAML'}</span>
+            </button>
+          </div>
         </div>
 
         <pre className="p-5 font-mono text-xs text-cyan-200/90 bg-[#090d16] overflow-x-auto whitespace-pre leading-relaxed">

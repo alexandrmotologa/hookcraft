@@ -201,3 +201,29 @@ B:\workgit\hookcraft\
 - [x] Write `docs/ARCHITECTURE.md`, `docs/CONFIGURATION.md`, and `docs/SECRET_SHIELD.md`.
 - [x] Write humanized `README.md` without AI cliches, em dashes, or empty claims.
 - [x] Create Makefile and cross-compilation release scripts.
+
+### Phase 8: Advanced Security and Git Governance Shields
+- [x] Implement `.hookcraftignore` parser supporting global exclusions for secret scanning and hooks.
+- [x] Implement `builtin:file_size_shield` to prevent accidental commits of large files (> 5MB).
+- [x] Implement `builtin:branch_protection` for `pre-push` hooks to guard against direct pushes to `main`/`master`.
+- [x] Write unit tests for `.hookcraftignore`, file size inspection, and branch protection.
+
+### Phase 9: Content-Addressable Caching Engine
+- [x] Implement `internal/cache/cache.go` computing SHA-256 hashes of command strings and file contents.
+- [x] Store cache index in `.hookcraft/cache/index.json`.
+- [x] Skip unmodified steps with instant cache hit (`⚡ CACHED (< 1ms)`).
+- [x] Add `hookcraft cache clean` CLI command.
+- [x] Write unit tests for cache hits, file modification invalidations, and command changes.
+
+### Phase 10: Automatic Migration Tool and Issue Ticket Enforcement
+- [x] Implement `internal/migrate/migrate.go` parsing `.pre-commit-config.yaml`, `lefthook.yml`, and `.husky/`.
+- [x] Add `hookcraft migrate` CLI command generating `.hookcraft.yaml`.
+- [x] Extend `builtin:conventional_commits` to support issue ticket validation (`ticket_pattern`).
+- [x] Write unit tests for migration parsers and ticket pattern matching.
+
+### Phase 11: Interactive Studio Actions and Real-Time Runner
+- [x] Implement `POST /api/run` in `internal/server/` to execute hooks on demand.
+- [x] Implement `POST /api/stage` to stage modified files directly from the browser.
+- [x] Add interactive "Run Hook" button in React 19 Studio Overview.
+- [x] Add "Stage All Formatted Files" button in Staged Diff View.
+- [x] Rebuild React 19 production distribution (`npm run build`).

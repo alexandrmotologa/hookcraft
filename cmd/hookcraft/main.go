@@ -10,8 +10,10 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/alexandrmotologa/hookcraft/internal/cache"
 	"github.com/alexandrmotologa/hookcraft/internal/config"
 	"github.com/alexandrmotologa/hookcraft/internal/git"
+	"github.com/alexandrmotologa/hookcraft/internal/migrate"
 	"github.com/alexandrmotologa/hookcraft/internal/runner"
 	"github.com/alexandrmotologa/hookcraft/internal/server"
 	"github.com/alexandrmotologa/hookcraft/internal/tui"
@@ -46,6 +48,10 @@ func main() {
 		scanSecretsCommand(out, args)
 	case "init":
 		initProjectCommand(out, args)
+	case "migrate":
+		migrateProjectCommand(out, args)
+	case "cache":
+		cacheCommand(out, args)
 	case "status":
 		statusCommand(out, args)
 	case "serve", "studio":
@@ -68,7 +74,7 @@ func main() {
 }
 
 func printUsage() {
-	fmt.Printf(`HookCraft — Ultra-Fast Zero-Dependency Git Hook Orchestrator (< 15MB RAM)
+	fmt.Printf(`HookCraft: Ultra-Fast Zero-Dependency Git Hook Orchestrator (< 15MB RAM)
 
 Usage:
   hookcraft <command> [arguments]
@@ -79,6 +85,8 @@ Commands:
   uninstall           Remove HookCraft shims and restore previous hooks
   scan                Scan staged diffs or files for sensitive API keys and secrets
   init                Generate a tailored .hookcraft.yaml for the current repository
+  migrate             Migrate existing Husky, Python pre-commit, or Lefthook config
+  cache [clean]       Manage content-addressable execution cache
   status              Display Git hook installation and repository status
   serve, studio       Launch the embedded Web Studio and Benchmark Waterfall
   version             Print version and build details
@@ -349,4 +357,69 @@ func serveDashboardCommand(out *tui.Output, args []string) {
 		fmt.Fprintf(os.Stderr, "[hookcraft] Studio Server error: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+func migrateProjectCommand(out *tui.Output, args []string) {
+	gitRunner, err := git.NewRunner("")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[hookcraft] Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	targetPath := filepath.Join(gitRunner.RepoRoot, ".hookcraft.yaml")
+	if _, err := os.Stat(targetPath); err == nil {
+		fmt.Printf("[hookcraft] Warning: .hookcraft.yaml already exists at %s\n", targetPath)
+		fmt.Print("Overwrite existing configuration? [y/N]: ")
+		var resp string
+		_, _ = fmt.Scanln(&resp)
+		if strings.ToLower(strings.TrimSpace(resp)) != "y" {
+			fmt.Println("Migration aborted.")
+			return
+		}
+	}
+
+	result, err := migrate.DetectAndMigrate(gitRunner.RepoRoot)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[hookcraft] Migration failed: %v\n", err)
+		os.Exit(1)
+	}
+
+	if err := os.WriteFile(targetPath, []byte(result.GeneratedYAML), 0644); err != nil {
+		fmt.Fprintf(os.Stderr, "[hookcraft] Failed to write .hookcraft.yaml: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("%s Successfully migrated from %s (%s):\n",
+		out.Colorize(tui.Bold+tui.Green, "✓"),
+		out.Colorize(tui.Bold+tui.Cyan, result.SourceType),
+		result.SourcePath,
+	)
+	for _, h := range result.MigratedHooks {
+		fmt.Printf("  - %s\n", h)
+	}
+	fmt.Printf("\nGenerated clean configuration at: %s\n", targetPath)
+}
+
+func cacheCommand(out *tui.Output, args []string) {
+	gitRunner, err := git.NewRunner("")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[hookcraft] Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	mgr := cache.NewManager(gitRunner.RepoRoot)
+
+	if len(args) > 0 && args[0] == "clean" {
+		if err := mgr.Clean(); err != nil {
+			fmt.Fprintf(os.Stderr, "[hookcraft] Failed to clean cache: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("%s Cleaned execution cache.\n", out.Colorize(tui.Bold+tui.Green, "✓"))
+		return
+	}
+
+	fmt.Printf("%s Cache Status:\n", out.Colorize(tui.Bold+tui.Cyan, "HookCraft"))
+	fmt.Printf("  Cache Directory : %s\n", mgr.CacheDir)
+	fmt.Printf("  Cached Entries  : %d\n", mgr.Size())
+	fmt.Println("\nTo clean the cache, run: hookcraft cache clean")
 }

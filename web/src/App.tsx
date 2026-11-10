@@ -15,6 +15,9 @@ export const App: React.FC = () => {
   const [diffData, setDiffData] = useState<DiffResponse | null>(null);
   const [configData, setConfigData] = useState<ConfigResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [runningHook, setRunningHook] = useState(false);
+  const [staging, setStaging] = useState(false);
+  const [clearingCache, setClearingCache] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -53,6 +56,50 @@ export const App: React.FC = () => {
     }
   };
 
+  const runHook = async (hookName: string) => {
+    setRunningHook(true);
+    try {
+      await fetch('/api/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hook_name: hookName }),
+      });
+      await fetchData();
+    } catch (err) {
+      console.error('Failed to run hook:', err);
+    } finally {
+      setRunningHook(false);
+    }
+  };
+
+  const stageFiles = async () => {
+    setStaging(true);
+    try {
+      await fetch('/api/stage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      await fetchData();
+    } catch (err) {
+      console.error('Failed to stage files:', err);
+    } finally {
+      setStaging(false);
+    }
+  };
+
+  const clearCache = async () => {
+    setClearingCache(true);
+    try {
+      await fetch('/api/cache/clean', { method: 'POST' });
+      await fetchData();
+    } catch (err) {
+      console.error('Failed to clear cache:', err);
+    } finally {
+      setClearingCache(false);
+    }
+  };
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -65,6 +112,8 @@ export const App: React.FC = () => {
         setActiveTab={setActiveTab}
         loading={loading}
         onRefresh={fetchData}
+        onRunHook={runHook}
+        runningHook={runningHook}
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto p-6 space-y-6">
@@ -86,11 +135,11 @@ export const App: React.FC = () => {
         )}
 
         {activeTab === 'diff' && (
-          <StagedDiffView diffData={diffData} />
+          <StagedDiffView diffData={diffData} onStageFiles={stageFiles} staging={staging} />
         )}
 
         {activeTab === 'config' && (
-          <ConfigEditor configData={configData} />
+          <ConfigEditor configData={configData} onClearCache={clearCache} clearingCache={clearingCache} />
         )}
       </main>
 

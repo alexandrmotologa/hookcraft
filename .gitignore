@@ -25,4 +25,4 @@ web/.vite/
 Thumbs.db
 
 # Hookcraft runtime cache and history
-.hookcraft/history.json
+.hookcraft/

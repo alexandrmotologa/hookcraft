@@ -89,6 +89,12 @@ func (o *Output) PrintStep(res runner.StepResult) {
 		return
 	}
 
+	if res.Cached {
+		statusMark = o.Colorize(Bold+Cyan, "⚡ CACHED")
+		fmt.Fprintf(o.writer, "  %s  %-28s %s\n", statusMark, res.StepName, timing)
+		return
+	}
+
 	if res.Success {
 		statusMark = o.Colorize(Bold+Green, CheckMark+" PASS")
 		fmt.Fprintf(o.writer, "  %s  %-28s %s\n", statusMark, res.StepName, timing)

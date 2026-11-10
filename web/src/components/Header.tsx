@@ -1,5 +1,5 @@
 import React from 'react';
-import { Shield, GitBranch, RefreshCw, Activity, FileCode, Terminal } from 'lucide-react';
+import { Shield, GitBranch, RefreshCw, Activity, FileCode, Terminal, Play } from 'lucide-react';
 import { StatusResponse } from '../types';
 
 interface HeaderProps {
@@ -8,6 +8,8 @@ interface HeaderProps {
   setActiveTab: (tab: 'overview' | 'secrets' | 'diff' | 'config') => void;
   loading: boolean;
   onRefresh: () => void;
+  onRunHook: (hookName: string) => Promise<void>;
+  runningHook: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -16,6 +18,8 @@ export const Header: React.FC<HeaderProps> = ({
   setActiveTab,
   loading,
   onRefresh,
+  onRunHook,
+  runningHook,
 }) => {
   return (
     <header className="border-b border-[#1f293d] bg-[#0c1220]/80 backdrop-blur-md sticky top-0 z-50 px-6 py-4">
@@ -95,6 +99,16 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right Info & Actions */}
         <div className="flex items-center space-x-3">
+          <button
+            onClick={() => onRunHook('pre-commit')}
+            disabled={runningHook || loading}
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-sm shadow-emerald-600/30 transition-all disabled:opacity-50"
+            title="Execute pre-commit hooks"
+          >
+            <Play className={`w-3.5 h-3.5 fill-current ${runningHook ? 'animate-pulse' : ''}`} />
+            <span>{runningHook ? 'Running...' : 'Run pre-commit'}</span>
+          </button>
+
           {status && (
             <div className="hidden lg:flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-[#111827] border border-[#1f293d] text-xs font-mono text-slate-300">
               <GitBranch className="w-3.5 h-3.5 text-cyan-400" />

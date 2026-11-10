@@ -15,9 +15,12 @@ HookCraft solves common developer friction points associated with traditional Gi
 
 - Zero runtime dependencies: Compiled as a standalone Go binary. It does not require Node.js, npm, or Python virtual environments.
 - Fast concurrent execution: Runs linters and formatters concurrently across CPU cores in under 100 milliseconds, operating strictly on staged files (`git diff --staged`).
+- Content-Addressable Cache: Computes SHA-256 signatures over step commands and staged file contents to skip clean steps with `⚡ CACHED (< 1ms)`.
 - Built-in Secret Leak Shield: Evaluates staged diffs using pre-compiled signatures (AWS, GitHub, Stripe, OpenAI) and Shannon entropy heuristics to block committed credentials.
 - Safe Stash Guard: Isolates unstaged working tree modifications during hook execution, preventing dirty code leaks and formatter merge conflicts.
+- Large File and Branch Protection Shields: Built-in shields preventing accidental commits over 5MB or direct pushes to protected branches (`main`, `master`).
 - Interactive Fix Approver: Automatically detects files modified by formatters (such as Prettier, Ruff, or `gofmt`) and provides 1-key approval (`[y/n/d]`) or automatic re-staging.
+- Instant Migration Engine: Converts `.pre-commit-config.yaml` (Python), `lefthook.yml`, and `.husky/` setups into a native `.hookcraft.yaml` via `hookcraft migrate`.
 - Embedded Studio: Includes a React 19 web dashboard served directly from the executable for execution waterfalls and secret audit inspection.
 
 ---
@@ -164,6 +167,8 @@ Open `http://localhost:4173` in your browser. The dashboard is embedded directly
 | `hookcraft uninstall` | Removes HookCraft shims and restores previous backups. |
 | `hookcraft scan` | Runs the Secret Leak Shield on staged changes or repository files. |
 | `hookcraft init` | Generates a tailored `.hookcraft.yaml` for the current repository. |
+| `hookcraft migrate` | Automatically converts Husky, pre-commit, or Lefthook configs to HookCraft. |
+| `hookcraft cache [clean]` | Displays cache directory information or clears cached step results. |
 | `hookcraft status` | Displays active hook shims and repository state. |
 | `hookcraft studio` | Launches the embedded React 19 web dashboard. |
 | `hookcraft version` | Prints binary version and compilation date. |

@@ -21,6 +21,7 @@ type StepResult struct {
 	DurationMs     float64           `json:"duration_ms"`
 	ExitCode       int               `json:"exit_code"`
 	Success        bool              `json:"success"`
+	Cached         bool              `json:"cached"`
 	Output         string            `json:"output"`
 	MatchedFiles   []string          `json:"matched_files"`
 	ModifiedFiles  []string          `json:"modified_files"`

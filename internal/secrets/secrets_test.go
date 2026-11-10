@@ -146,3 +146,30 @@ func TestPathExclusion(t *testing.T) {
 		t.Fatalf("expected 0 findings for package-lock.json, got %d", len(findings))
 	}
 }
+
+func TestHookcraftIgnoreCustomPatterns(t *testing.T) {
+	scanner := NewScanner(3.8)
+	scanner.SetIgnorePatterns([]string{"legacy/*", "public_keys.env"})
+
+	line := `const AWS_KEY = "AKIA1234567890ABCDEF";`
+
+	hunks := []git.FileHunk{
+		{
+			FilePath: "legacy/old_service.go",
+			AddedLines: []git.DiffLine{
+				{LineNumber: 15, Content: line},
+			},
+		},
+		{
+			FilePath: "public_keys.env",
+			AddedLines: []git.DiffLine{
+				{LineNumber: 2, Content: line},
+			},
+		},
+	}
+
+	findings := scanner.ScanHunks(hunks)
+	if len(findings) != 0 {
+		t.Fatalf("expected 0 findings for files matching .hookcraftignore patterns, got %d", len(findings))
+	}
+}

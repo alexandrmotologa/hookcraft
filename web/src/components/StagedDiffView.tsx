@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { FileCode, Layers } from 'lucide-react';
+import { FileCode, Layers, CheckSquare } from 'lucide-react';
 import { DiffResponse, FileHunk } from '../types';
 
 interface StagedDiffViewProps {
   diffData: DiffResponse | null;
+  onStageFiles?: () => Promise<void>;
+  staging?: boolean;
 }
 
-export const StagedDiffView: React.FC<StagedDiffViewProps> = ({ diffData }) => {
+export const StagedDiffView: React.FC<StagedDiffViewProps> = ({ diffData, onStageFiles, staging }) => {
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
 
   if (!diffData || diffData.hunks.length === 0) {
@@ -29,9 +31,23 @@ export const StagedDiffView: React.FC<StagedDiffViewProps> = ({ diffData }) => {
     : hunks[0];
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-      {/* File List */}
-      <div className="lg:col-span-1 rounded-xl bg-[#111827] border border-[#1f293d] p-3 space-y-2">
+    <div className="space-y-3">
+      {onStageFiles && (
+        <div className="flex justify-end">
+          <button
+            onClick={onStageFiles}
+            disabled={staging}
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold shadow-sm shadow-cyan-600/30 transition-all disabled:opacity-50"
+          >
+            <CheckSquare className="w-3.5 h-3.5" />
+            <span>{staging ? 'Staging...' : 'Stage Modified Changes'}</span>
+          </button>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+        {/* File List */}
+        <div className="lg:col-span-1 rounded-xl bg-[#111827] border border-[#1f293d] p-3 space-y-2">
         <div className="px-2 py-1 text-xs font-semibold text-slate-400 uppercase tracking-wider">
           Staged Files ({hunks.length})
         </div>
@@ -100,6 +116,7 @@ export const StagedDiffView: React.FC<StagedDiffViewProps> = ({ diffData }) => {
           )}
         </div>
       </div>
+    </div>
     </div>
   );
 };

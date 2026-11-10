@@ -1,6 +1,7 @@
 package secrets
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -33,10 +34,51 @@ var DefaultExcludedFilenames = map[string]bool{
 	"Gemfile.lock":      true,
 }
 
+// LoadIgnorePatterns loads pattern rules from .hookcraftignore if present.
+func LoadIgnorePatterns(repoRoot string) []string {
+	ignorePath := filepath.Join(repoRoot, ".hookcraftignore")
+	data, err := os.ReadFile(ignorePath)
+	if err != nil {
+		return nil
+	}
+
+	var patterns []string
+	lines := strings.Split(string(data), "\n")
+	for _, l := range lines {
+		trimmed := strings.TrimSpace(l)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		patterns = append(patterns, filepath.ToSlash(trimmed))
+	}
+	return patterns
+}
+
 // IsPathExcluded checks if the given file path should be exempted from secret scanning.
 func IsPathExcluded(filePath string) bool {
+	return IsPathExcludedWithIgnore(filePath, nil)
+}
+
+// IsPathExcludedWithIgnore checks if file is excluded via built-in rules or .hookcraftignore patterns.
+func IsPathExcludedWithIgnore(filePath string, customPatterns []string) bool {
 	cleanPath := filepath.ToSlash(filePath)
 	base := filepath.Base(cleanPath)
+
+	for _, pattern := range customPatterns {
+		cleanPattern := filepath.ToSlash(pattern)
+		if strings.HasSuffix(cleanPattern, "/") {
+			if strings.HasPrefix(cleanPath, strings.TrimSuffix(cleanPattern, "/")+"/") ||
+				strings.Contains(cleanPath, "/"+strings.TrimSuffix(cleanPattern, "/")+"/") {
+				return true
+			}
+		}
+		if match, _ := filepath.Match(cleanPattern, cleanPath); match {
+			return true
+		}
+		if match, _ := filepath.Match(cleanPattern, base); match {
+			return true
+		}
+	}
 
 	if DefaultExcludedFilenames[base] {
 		return true

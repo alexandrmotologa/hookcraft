@@ -34,10 +34,13 @@ hooks:
 | :--- | :--- | :--- | :--- |
 | `concurrency` | boolean | `true` | Executes independent hook steps concurrently across CPU cores. |
 | `max_workers` | integer | `NumCPU` | Maximum number of concurrent worker processes. |
+| `enable_cache` | boolean | `true` | Content-addressable execution caching by command and file content hash. |
 | `auto_stage_fixes` | boolean | `true` | Automatically stages files modified by formatters during hook execution. |
 | `interactive_approval` | boolean | `false` | Prompts with a 1-key press `[y/n/d]` before re-staging modified files. |
 | `block_secret_leaks` | boolean | `true` | Blocks commits containing API keys, private keys, or high-entropy tokens. |
 | `entropy_threshold` | float | `3.8` | Minimum Shannon entropy (bits per byte) required to flag a token as random secret. |
+| `max_file_size_mb` | float | `5.0` | Maximum allowed staged file size before blocking in file size shield. |
+| `protected_branches` | list of strings | `["main", "master"]` | Git branch names protected against direct push in branch protection shield. |
 | `timeout_seconds` | integer | `30` | Default timeout applied to command execution. |
 | `stash_unstaged` | boolean | `true` | Automatically stashes unstaged working tree modifications during hook runs. |
 | `fail_fast` | boolean | `false` | Cancels remaining hook steps immediately upon the first failure. |
@@ -49,7 +52,13 @@ hooks:
 Each hook entry in `hooks.<hook_name>` accepts the following fields:
 
 - `name` (string, required): Human-readable name displayed in the terminal and dashboard.
-- `type` (string, optional): One of `command` (default), `builtin:secret_shield`, or `builtin:conventional_commits`.
+- `type` (string, optional): One of:
+  - `command` (default): Runs an external shell executable or script.
+  - `builtin:secret_shield`: Scans staged diffs for high-entropy tokens and API credentials.
+  - `builtin:file_size_shield`: Prevents accidental commits of large binary files exceeding `max_file_size_mb`.
+  - `builtin:branch_protection`: Prevents direct pushes to protected branches in `pre-push`.
+  - `builtin:conventional_commits`: Validates commit messages in `commit-msg`.
+- `ticket_pattern` (string, optional): Regular expression for requiring issue ticket keys in commit messages (for example `^[A-Z]{2,}-\d+:` or `\[JIRA-\d+\]`). Used with `builtin:conventional_commits`.
 - `glob` (string, optional): File pattern filter. Commands run only when matching files are staged. Supports brace expansion such as `*.{ts,tsx,js,json}`.
 - `exclude_glob` (string, optional): Exclusion pattern to skip matching files (for example `vendor/*` or `*.generated.go`).
 - `run` (string, optional): Shell command to execute. Supports dynamic placeholders.
@@ -153,3 +162,40 @@ hooks:
       run: "ruff check --fix {staged_files}"
       stage_fixed: true
 ```
+
+---
+
+## 6. `.hookcraftignore` File Format
+
+Create a `.hookcraftignore` file at the repository root to exclude specific paths from secret scanning or hook processing.
+
+```text
+# Comments are ignored
+test/fixtures/**
+*.snap
+docs/sample_tokens.txt
+vendor/
+```
+
+Rules:
+- Paths matching an entry are skipped during diff analysis.
+- Lines starting with `#` are treated as comments.
+- Supports recursive globbing (`**`) and standard file extensions.
+
+---
+
+## 7. Content-Addressable Caching
+
+When `settings.enable_cache` is `true` (default), HookCraft records an index entry for each executed step in `.hookcraft/cache/index.json`.
+
+The cache key is computed as:
+`SHA-256(step_name + ":" + command + ":" + hash(matching_staged_file_contents))`
+
+If neither the command string nor the staged file contents change across runs, the step is skipped with:
+`⚡ CACHED (< 1ms)`
+
+To invalidate or clear the local cache:
+```bash
+hookcraft cache clean
+```
+

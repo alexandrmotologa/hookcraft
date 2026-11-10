@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alexandrmotologa/hookcraft/internal/cache"
 	"github.com/alexandrmotologa/hookcraft/internal/config"
 	"github.com/alexandrmotologa/hookcraft/internal/git"
 	"github.com/alexandrmotologa/hookcraft/internal/secrets"
@@ -22,15 +23,22 @@ type Engine struct {
 	Config  *config.Config
 	Git     *git.Runner
 	Scanner *secrets.Scanner
+	Cache   *cache.Manager
 }
 
 // NewEngine creates an execution engine.
 func NewEngine(cfg *config.Config, gitRunner *git.Runner) *Engine {
 	scanner := secrets.NewScanner(cfg.Settings.EntropyThreshold)
+	var cacheMgr *cache.Manager
+	if gitRunner != nil {
+		scanner.SetIgnorePatterns(secrets.LoadIgnorePatterns(gitRunner.RepoRoot))
+		cacheMgr = cache.NewManager(gitRunner.RepoRoot)
+	}
 	return &Engine{
 		Config:  cfg,
 		Git:     gitRunner,
 		Scanner: scanner,
+		Cache:   cacheMgr,
 	}
 }
 
@@ -246,6 +254,19 @@ func (e *Engine) executeStep(ctx context.Context, step config.HookStep, stagedFi
 			res.Success = false
 			res.ExitCode = 1
 			res.Output = fmt.Sprintf("Invalid commit message: %q\nDoes not follow Conventional Commits format (e.g. feat(scope): subject, fix: description)", firstLine)
+		} else if step.RequireTicket {
+			pattern := step.TicketPattern
+			if pattern == "" {
+				pattern = `[A-Za-z0-9]+-[0-9]+`
+			}
+			re, err := regexp.Compile(pattern)
+			if err == nil && !re.MatchString(firstLine) {
+				res.Success = false
+				res.ExitCode = 1
+				res.Output = fmt.Sprintf("Commit message missing required issue ticket matching %q: %q", pattern, firstLine)
+			} else {
+				res.Output = fmt.Sprintf("Valid Conventional Commit with ticket: %q", firstLine)
+			}
 		} else {
 			res.Output = fmt.Sprintf("Valid Conventional Commit message: %q", firstLine)
 		}
@@ -255,7 +276,88 @@ func (e *Engine) executeStep(ctx context.Context, step config.HookStep, stagedFi
 		return res
 	}
 
-	// 3. Command Step
+	// 3. Built-in: File Size Shield
+	if step.Type == "builtin:file_size_shield" {
+		res.Command = "builtin:file_size_shield"
+		maxMB := step.MaxFileSizeMB
+		if maxMB <= 0 {
+			maxMB = e.Config.Settings.MaxFileSizeMB
+		}
+		if maxMB <= 0 {
+			maxMB = 5.0
+		}
+		maxBytes := int64(maxMB * 1024 * 1024)
+
+		filtered := config.FilterFilesByGlob(stagedFiles, step.Glob, step.ExcludeGlob)
+		sizes, err := e.Git.GetStagedFileSizes(filtered)
+		if err != nil {
+			res.Success = false
+			res.Output = fmt.Sprintf("Failed to check staged file sizes: %v", err)
+			res.Duration = time.Since(start)
+			res.DurationMs = float64(res.Duration.Microseconds()) / 1000.0
+			return res
+		}
+
+		var oversized []string
+		for file, size := range sizes {
+			if size > maxBytes {
+				fileMB := float64(size) / (1024.0 * 1024.0)
+				oversized = append(oversized, fmt.Sprintf("  - %s (%.2f MB) exceeds limit of %.1f MB", file, fileMB, maxMB))
+			}
+		}
+
+		if len(oversized) > 0 {
+			res.Success = false
+			res.ExitCode = 1
+			res.Output = fmt.Sprintf("File Size Shield blocked commit! Found %d large staged file(s):\n%s", len(oversized), strings.Join(oversized, "\n"))
+		} else {
+			res.Output = fmt.Sprintf("All staged files are within the %.1f MB size limit", maxMB)
+		}
+
+		res.Duration = time.Since(start)
+		res.DurationMs = float64(res.Duration.Microseconds()) / 1000.0
+		return res
+	}
+
+	// 4. Built-in: Branch Protection Shield
+	if step.Type == "builtin:branch_protection" {
+		res.Command = "builtin:branch_protection"
+		protected := step.ProtectedBranches
+		if len(protected) == 0 {
+			protected = []string{"main", "master"}
+		}
+
+		targetBranch := branchName
+		for _, arg := range hookArgs {
+			for _, p := range protected {
+				if strings.Contains(arg, p) {
+					targetBranch = p
+				}
+			}
+		}
+
+		isProtected := false
+		for _, p := range protected {
+			if targetBranch == p || config.MatchGlob(p, targetBranch) {
+				isProtected = true
+				break
+			}
+		}
+
+		if isProtected {
+			res.Success = false
+			res.ExitCode = 1
+			res.Output = fmt.Sprintf("Branch Protection Shield blocked push!\nDirect push to protected branch %q is not allowed. Please submit a Pull Request.", targetBranch)
+		} else {
+			res.Output = fmt.Sprintf("Branch %q is not protected", targetBranch)
+		}
+
+		res.Duration = time.Since(start)
+		res.DurationMs = float64(res.Duration.Microseconds()) / 1000.0
+		return res
+	}
+
+	// 5. Command Step
 	matchedFiles := config.FilterFilesByGlob(stagedFiles, step.Glob, step.ExcludeGlob)
 	res.MatchedFiles = matchedFiles
 
@@ -270,6 +372,23 @@ func (e *Engine) executeStep(ctx context.Context, step config.HookStep, stagedFi
 
 	finalCommand := SubstitutePlaceholders(step.Run, matchedFiles, stagedFiles, branchName)
 	res.Command = finalCommand
+
+	// Content-addressable cache check
+	var cacheKey string
+	if e.Config.Settings.EnableCache && e.Cache != nil && len(matchedFiles) > 0 && !step.StageFixed {
+		var err error
+		cacheKey, err = cache.ComputeKey(step.Name, finalCommand, matchedFiles, e.Git.RepoRoot)
+		if err == nil {
+			if entry, ok := e.Cache.Get(cacheKey); ok && entry.ExitCode == 0 {
+				res.Cached = true
+				res.Success = true
+				res.Output = entry.Output
+				res.Duration = time.Since(start)
+				res.DurationMs = float64(res.Duration.Microseconds()) / 1000.0
+				return res
+			}
+		}
+	}
 
 	timeout := step.GetTimeout(time.Duration(e.Config.Settings.TimeoutSeconds) * time.Second)
 	exitCode, output, err := ExecuteCommand(ctx, e.Git.RepoRoot, finalCommand, step.Env, timeout)
@@ -287,10 +406,17 @@ func (e *Engine) executeStep(ctx context.Context, step config.HookStep, stagedFi
 			}
 			res.Output += err.Error()
 		}
-	} else if step.StageFixed && len(matchedFiles) > 0 {
-		// Check if any of the matched files were modified on disk
-		modified, _ := e.Git.GetModifiedStagedFiles(matchedFiles)
-		res.ModifiedFiles = modified
+	} else {
+		// Cache successful execution
+		if e.Config.Settings.EnableCache && e.Cache != nil && cacheKey != "" && !step.StageFixed {
+			e.Cache.Put(cacheKey, step.Name, finalCommand, exitCode, output)
+		}
+
+		if step.StageFixed && len(matchedFiles) > 0 {
+			// Check if any of the matched files were modified on disk
+			modified, _ := e.Git.GetModifiedStagedFiles(matchedFiles)
+			res.ModifiedFiles = modified
+		}
 	}
 
 	return res
