@@ -1,0 +1,28 @@
+# Binaries
+bin/
+dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+hookcraft
+
+# Dependencies
+node_modules/
+vendor/
+
+# Web build output
+web/dist/
+web/.vite/
+
+# IDE & OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Hookcraft runtime cache and history
+.hookcraft/history.json
