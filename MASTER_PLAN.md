@@ -1,201 +1,203 @@
-# `hookcraft` — Architecture & Engineering Master Plan
+# hookcraft: Architecture and Engineering Master Plan
 
-> **Ultra-Fast Zero-Dependency Git Hook Orchestrator & Staged Secret Leak Shield (< 15MB RAM)**  
-> *Husky, Python Pre-Commit, and Lefthook Alternative in a Single Binary (Go + React 19 / TUI)*
-
----
-
-## 1. Executive Summary & Problem Space
-
-### The Core Problem
-Enforcing code quality, formatting, and security before code is committed to Git is an essential engineering discipline. However, current git hook tools create constant developer frustration:
-1. **Runtime Dependency Overhead (Husky)**: Requires Node.js and npm to be installed on every machine, making it completely unsuitable for pure Go, Rust, Python, or C++ repositories.
-2. **Glacial Execution Speed (Python `pre-commit`)**: Takes 3–8 seconds per commit because it creates and manages isolated Python virtual environments for every single hook, disrupting developer flow.
-3. **Accidental Secret Leaks**: Developers frequently commit `.env` files, AWS credentials, or OpenAI API keys by mistake because standard hook runners do not provide built-in high-speed entropy scanners.
-4. **Formatting Stash Conflicts**: When a formatter (like Prettier, Ruff, or Black) fixes code, developers must manually unstage, re-stage, and re-run the commit process.
-
-### The Solution: `hookcraft`
-`hookcraft` is an ultra-fast, zero-dependency git hook orchestrator and secret leak shield compiled as a single Go binary. It installs into `.git/hooks` with a single command (`hookcraft install`).
-
-`hookcraft` runs configured linters, formatters, and type-checkers **concurrently across CPU cores in sub-100 milliseconds**, operating exclusively on staged files (`git diff --staged`). It includes an **Automated Secret Leak Shield** that blocks commits containing API keys or credentials, and an **Interactive Fix Approver** that automatically re-stages clean formatted code with zero manual friction.
+Ultra-Fast Zero-Dependency Git Hook Orchestrator and Staged Secret Leak Shield in Go (< 15MB RAM).
+A modern, single-binary alternative to Husky, Python pre-commit, and Lefthook.
 
 ---
 
-## 2. System Architecture & Hook Lifecycle
+## 1. System Overview
+
+HookCraft solves four core problems in developer workflows:
+1. Runtime dependency overhead: Tools like Husky require Node.js and npm in non-JS projects (Go, Rust, Python, C++).
+2. Execution latency: Python pre-commit takes 3 to 8 seconds per commit due to virtualenv setup and interpreter startup.
+3. Secret leakage: Standard hook runners lack built-in real-time secret scanning on staged diffs before commit creation.
+4. Formatter stash conflicts: Formatters modify code during hooks, leaving changes unstaged or clobbering dirty working trees.
+
+HookCraft compiles to a single native Go binary without runtime dependencies. It installs POSIX shims into `.git/hooks` with `hookcraft install`, evaluates staged diffs (`git diff --staged`) concurrently in under 100 milliseconds, blocks credentials using Shannon entropy and pattern matching, and provides one-key interactive staging for auto-formatted files.
+
+---
+
+## 2. Architecture and Data Flow
 
 ```
-[ Developer runs `git commit -m "feat: user auth"` ]
-                         │
-                         ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                        `hookcraft` Pre-Commit Hook                     │
-│                                                                        │
-│  ┌──────────────────────────────────────────────────────────────────┐  │
-│  │ Staged File Scanner (git diff --staged --name-only)              │  │
-│  │ - Identifies modified files by extension (.ts, .go, .py, .rs)    │  │
-│  │ - Stashes unstaged modifications to prevent dirty file leakage   │  │
-│  └──────────────────────────────────┬───────────────────────────────┘  │
-│                                     │                                  │
-│                                     ▼                                  │
-│  ┌──────────────────────────────────────────────────────────────────┐  │
-│  │ High-Speed Secret Leak Shield (Shannon Entropy + Regex Scanner)  │  │
-│  │ - Scans staged diffs for AWS keys, OpenAI tokens, private keys   │  │
-│  │ - If SECRET FOUND -> Abort commit immediately with line pointer  │  │
-│  └──────────────────────────────────┬───────────────────────────────┘  │
-│                                     │ Clean Diffs                      │
-│                                     ▼                                  │
-│  ┌──────────────────────────────────────────────────────────────────┐  │
-│  │ Concurrent Hook Worker Pool (Goroutines across CPU Cores)        │  │
-│  │                                                                  │  │
-│  │  [ Worker 1: Biome / Prettier ] --> Format check / auto-fix      │  │
-│  │  [ Worker 2: ESLint / Ruff ]    --> Code linting                 │  │
-│  │  [ Worker 3: tsc / go vet ]     --> Type and syntax validation   │  │
-│  └──────────────────────────────────┬───────────────────────────────┘  │
-│                                     │                                  │
-│         ┌───────────────────────────┴──────────────────────────┐       │
-│         │ Any files auto-formatted?                            │ All passed?
-│         ▼                                                      ▼       │
-│  ┌───────────────────────────────┐           ┌──────────────────────┐  │
-│  │ Interactive Fix Approver      │           │ Commit Proceeds!     │  │
-│  │ - Shows clean TUI diff        │           │ (Exit 0, < 100ms)    │  │
-│  │ - Auto-stages formatted files │           └──────────────────────┘  │
-│  └───────────────────────────────┘                                     │
-│                                                                        │
-│  ┌──────────────────────────────────────────────────────────────────┐  │
-│  │ Embedded React 19 & TUI Studio                                   │  │
-│  │ - Historical Hook Benchmark Waterfall, Secret Rules Configurator │  │
-│  └──────────────────────────────────────────────────────────────────┘  │
-└────────────────────────────────────────────────────────────────────────┘
+[ git commit -m "feat: core" ]
+             |
+             v
++-------------------------------------------------------------------------+
+| hookcraft pre-commit (Binary entrypoint)                                |
+|                                                                         |
+| 1. Environment & Git Discovery                                          |
+|    - Verify git repository root via git rev-parse                       |
+|    - Parse .hookcraft.yaml (or embedded language presets)               |
+|                                                                         |
+| 2. Stash Guard (Safe Partial Staging)                                   |
+|    - Detect unstaged modifications on staged files                      |
+|    - Stash unstaged changes with git stash create / store               |
+|    - Guarantee cleanup via deferred signal handlers (SIGINT/SIGTERM)   |
+|                                                                         |
+| 3. Staged Diff Extraction                                               |
+|    - git diff --staged --name-only -z (nul-byte safe paths)            |
+|    - Parse git diff --staged -U0 for hunk-level inspection             |
+|                                                                         |
+| 4. Secret Leak Shield (Shannon Entropy + 25+ Signatures)                |
+|    - Evaluate added lines only ('+' lines in diff hunks)                |
+|    - High entropy verification (> 3.8 bits/byte on raw tokens)          |
+|    - Provider signatures: AWS, OpenAI, GitHub PAT, Slack, Stripe, etc.  |
+|    - Check inline ignore comments (hookcraft:ignore)                    |
+|    - If leak detected: Print file, line, redacted token, abort (exit 1) |
+|                                                                         |
+| 5. Concurrent Hook Execution Engine                                     |
+|    - Worker pool sized to runtime.NumCPU()                             |
+|    - Filter staged files against hook glob rules                        |
+|    - Dynamic variable substitution ({staged_files}, {all_files})        |
+|    - Stream command output, capture elapsed runtimes                    |
+|                                                                         |
+| 6. Formatter Auto-Staging & Interactive Approver                        |
+|    - Detect working tree file modifications post-execution              |
+|    - If stage_fixed is true: auto-stage with git add                    |
+|    - If interactive: display concise diff and prompt [Y/n]              |
+|                                                                         |
+| 7. Stash Restore & Metric Recording                                     |
+|    - Restore unstaged working tree changes cleanly                      |
+|    - Append run metrics to .hookcraft/history.json                      |
+|    - Exit 0 to complete commit in sub-100ms                             |
++-------------------------------------------------------------------------+
 ```
 
 ---
 
 ## 3. Technology Stack
 
-| Layer | Component | Specification |
-| :--- | :--- | :--- |
-| **Language & Runtime** | Go 1.23+ | Ultra-fast native execution (< 15MB RAM), zero runtime dependencies |
-| **Git Integration** | Direct Git Plumbing | Interacts via `git rev-parse`, `git diff --staged`, and `git update-index` |
-| **Secret Scanner Engine**| Shannon Entropy + Regex | Scans diff chunks for high-entropy strings and known cloud provider patterns |
-| **Concurrency Engine** | Goroutine Worker Pool | Parallelizes independent commands across available CPU cores |
-| **Terminal TUI** | ANSI Terminal Engine | Clean terminal spinners, colored diffs, and interactive keystroke prompts |
-| **Embedded Web UI** | React 19 + TypeScript + Vite | Built as a single bundle and served via Go `//go:embed` |
-| **UI Styling** | Tailwind CSS + Lucide Icons | High-contrast modern developer tool cockpit |
+- Language: Go 1.23+ (Compiled native binary, memory footprint under 15MB)
+- Git Interface: Direct Git plumbing commands (`git rev-parse`, `git diff`, `git update-index`, `git stash`)
+- Secret Analysis: Shannon entropy calculation and pre-compiled regex signatures for 25+ cloud credentials
+- Concurrency: Goroutine worker pool with context cancellation and error groups
+- Terminal Interface: ANSI 256-color terminal engine, spinner animations, and raw-mode keypress reader
+- Embedded Dashboard: React 19 + TypeScript + Vite + Tailwind CSS compiled into Go binary via `embed.FS`
+- Storage: Flat JSON execution log (`.hookcraft/history.json`) for timeline visualization
 
 ---
 
-## 4. Repository & Directory Structure
+## 4. Repository Structure
 
 ```
 B:\workgit\hookcraft\
 ├── cmd\
 │   └── hookcraft\
-│       └── main.go                 # CLI entrypoint (`run`, `install`, `lint`, `serve`)
+│       └── main.go                 # CLI entrypoint (run, install, uninstall, scan, init, serve)
 ├── internal\
 │   ├── config\
-│   │   ├── config.go               # YAML configuration parser (`.hookcraft.yaml`)
-│   │   └── defaults.go             # Built-in presets for TypeScript, Go, Python, and Rust
+│   │   ├── config.go               # Configuration parser and schema definition
+│   │   ├── defaults.go             # Preset detectors for Go, Node/TS, Python, Rust
+│   │   └── validator.go            # Config validation and glob syntax checker
 │   ├── git\
-│   │   ├── hooks.go                # Installs/uninstalls hook scripts in `.git/hooks/`
-│   │   ├── staged.go               # Inspects staged files and diff hunks
-│   │   └── stash.go                # Stashes and unstashes unstaged changes safely
-│   ├── runner\
-│   │   ├── engine.go               # Concurrent hook execution orchestrator
-│   │   ├── worker.go               # Individual command runner with timeout and exit code check
-│   │   └── formatter.go            # Auto-formatting detector and staging helper
+│   │   ├── repo.go                 # Repository discovery and git plumbing executor
+│   │   ├── hooks.go                # Hook shim installer and uninstaller
+│   │   ├── staged.go               # Staged file lister and diff hunk parser
+│   │   └── stash.go                # Safe partial staging and working tree isolation
 │   ├── secrets\
-│   │   ├── scanner.go              # Scans diff hunks for sensitive patterns
-│   │   ├── entropy.go              # Shannon entropy calculator for random token detection
-│   │   └── rules.go                # Regex rules: AWS, Stripe, GitHub, OpenAI, Private Keys
+│   │   ├── entropy.go              # Shannon entropy analyzer for randomized tokens
+│   │   ├── rules.go                # Signatures for AWS, OpenAI, GitHub, Stripe, SSH, etc.
+│   │   ├── scanner.go              # Diff scanner, inline suppression, line mapper
+│   │   └── allowlist.go            # Path exclusions and token false-positive filters
+│   ├── runner\
+│   │   ├── engine.go               # Concurrent worker pool and execution pipeline
+│   │   ├── worker.go               # Process runner with context timeout and output pipes
+│   │   ├── substitution.go         # Variable replacement ({staged_files}, {count}, etc.)
+│   │   └── history.go              # Execution run metrics logger
 │   ├── tui\
-│   │   ├── terminal.go             # Terminal output formatter, spinners, and progress bar
-│   │   └── prompt.go               # Interactive prompt for approving auto-formatted diffs
+│   │   ├── terminal.go             # ANSI colors, status indicators, and summary tables
+│   │   ├── spinner.go              # Lightweight terminal spinner
+│   │   └── prompt.go               # Interactive keyboard reader for fix approval
 │   └── server\
-│       └── server.go               # Embedded web server for visual hook management
+│       ├── server.go               # HTTP API server and embedded asset handler
+│       ├── handlers.go             # Endpoints for metrics, config, diffs, and health
+│       └── embedded.go             # Go embed integration with fallback development proxy
 ├── web\
 │   ├── src\
 │   │   ├── components\
-│   │   │   ├── HookTimeline.tsx    # Benchmark waterfall of execution times per hook
-│   │   │   ├── SecretShieldLog.tsx # Log of blocked secret leaks with file and line numbers
-│   │   │   └── StagedDiffViewer.tsx# Visual diff viewer of staged modifications
-│   │   ├── App.tsx                 # Root developer cockpit
-│   │   ├── main.tsx                # React 19 entrypoint
-│   │   └── index.css               # Tailwind CSS declarations
+│   │   │   ├── Header.tsx          # Top navigation and status bar
+│   │   │   ├── WaterfallChart.tsx  # Execution time breakdown per hook
+│   │   │   ├── SecretShieldView.tsx# Secret audit log with file line highlights
+│   │   │   ├── StagedDiffView.tsx  # Colorized staged diff browser
+│   │   │   ├── ConfigEditor.tsx    # Live YAML config inspector and validator
+│   │   │   └── MetricCards.tsx     # Summary statistics (memory, speed, commit counts)
+│   │   ├── types\
+│   │   │   └── index.ts            # TypeScript interfaces matching Go backend
+│   │   ├── App.tsx                 # Main dashboard view
+│   │   ├── main.tsx                # React 19 bootstrap
+│   │   └── index.css               # Tailwind CSS rules
+│   ├── index.html
 │   ├── package.json
 │   ├── tsconfig.json
 │   └── vite.config.ts
-├── Makefile                        # Multi-platform build and release targets
-├── Dockerfile                      # Scratch container image (< 15MB)
-├── README.md                       # Comprehensive guide and `.hookcraft.yaml` configuration examples
-└── MASTER_PLAN.md                  # This master specification
+├── docs\
+│   ├── ARCHITECTURE.md             # Detailed engineering specifications
+│   ├── CONFIGURATION.md            # Configuration reference and presets
+│   └── SECRET_SHIELD.md            # Entropy heuristics and signature database
+├── .hookcraft.yaml                 # Repository configuration
+├── .gitignore
+├── Makefile                        # Multi-platform compilation and test runner
+├── Dockerfile                      # Scratch container image
+├── LICENSE                         # MIT License
+├── README.md                       # Documentation following humanizer guidelines
+└── MASTER_PLAN.md                  # This file
 ```
 
 ---
 
-## 5. Configuration Specification (`.hookcraft.yaml`)
+## 5. Implementation Roadmap and Progress Tracking
 
-```yaml
-version: 1
-settings:
-  concurrency: true
-  auto_stage_fixes: true
-  block_secret_leaks: true
+### Phase 1: Git Plumbing and Environment Detection
+- [x] Create public GitHub repository with 14 topic tags and description.
+- [x] Register HookCraft in developer portfolio (mtlg-site & mtlglabs-space Phase 1).
+- [x] Initialize Go module `github.com/alexandrmotologa/hookcraft`.
+- [x] Implement `internal/git/repo.go` for git discovery and command execution.
+- [x] Implement `internal/git/staged.go` for nul-terminated staged file extraction and hunk parsing.
+- [x] Implement `internal/git/stash.go` for safe stash preservation of unstaged modifications.
+- [x] Implement `internal/git/hooks.go` for shim generation in `.git/hooks/`.
+- [x] Write unit tests for git plumbing operations.
 
-hooks:
-  pre-commit:
-    - name: "Format (Prettier)"
-      glob: "*.{ts,tsx,js,json,css}"
-      run: "npx prettier --write {staged_files}"
-      stage_fixed: true
+### Phase 2: Configuration and Preset Engine
+- [x] Define YAML schema in `internal/config/config.go` supporting hooks, globs, parallel execution, and timeouts.
+- [x] Implement built-in auto-detection presets for Go, TypeScript, Python, and Rust in `internal/config/defaults.go`.
+- [x] Add config validation and glob matching logic.
+- [x] Implement `hookcraft init` CLI command to bootstrap tailored configs.
+- [x] Write unit tests for configuration parsing, fallback defaults, and validation.
 
-    - name: "Lint (ESLint)"
-      glob: "*.{ts,tsx}"
-      run: "npx eslint --max-warnings 0 {staged_files}"
+### Phase 3: High-Speed Secret Leak Shield
+- [x] Implement Shannon entropy calculator in `internal/secrets/entropy.go`.
+- [x] Create pattern database in `internal/secrets/rules.go` covering 25+ cloud credentials.
+- [x] Implement diff hunk scanner in `internal/secrets/scanner.go` checking only added lines.
+- [x] Implement false positive suppression (`hookcraft:ignore` comments, test fixture paths, hashes).
+- [x] Build standalone `hookcraft scan` CLI command for testing diffs or directory trees.
+- [x] Write comprehensive unit tests for secret detection, entropy scoring, and suppression.
 
-    - name: "Go Vet & Format"
-      glob: "*.go"
-      run: "gofmt -w {staged_files}"
-      stage_fixed: true
+### Phase 4: Concurrent Execution Engine
+- [x] Build worker pool and execution scheduler in `internal/runner/engine.go`.
+- [x] Implement file glob filtering and placeholder substitution (`{staged_files}`).
+- [x] Implement process execution with context timeouts, exit code handling, and output capture.
+- [x] Implement post-execution file modification detector for linters and formatters.
+- [x] Implement `.hookcraft/history.json` run metrics logger.
+- [x] Write unit tests for parallel execution, command timeout handling, and file substitution.
 
-    - name: "Secret Leak Shield"
-      type: "builtin:secret_scanner"
-      action: "block"
+### Phase 5: Terminal User Interface (TUI)
+- [x] Implement ANSI color palette, spinner animations, and run summary tables in `internal/tui/terminal.go`.
+- [x] Implement interactive 1-key approval prompt (`[Y]es / [n]o / [d]iff`) in `internal/tui/prompt.go`.
+- [x] Support non-interactive CI mode (`--non-interactive` or detecting absence of TTY).
+- [x] Verify execution time output matches sub-100ms targets.
 
-  pre-push:
-    - name: "Type Check"
-      run: "npx tsc --noEmit"
-    - name: "Go Tests"
-      run: "go test -short ./..."
-```
+### Phase 6: Embedded Web Dashboard (React 19 + TypeScript + Vite)
+- [x] Scaffold React 19 application in `web/` using Tailwind CSS and Lucide icons.
+- [x] Build hook waterfall timeline component displaying historical and current execution times.
+- [x] Build secret shield audit viewer displaying flagged files, line numbers, and redacted tokens.
+- [x] Build staged diff viewer for visual code inspection.
+- [x] Build live configuration viewer with syntax validation.
+- [x] Implement Go HTTP server in `internal/server/` serving embedded UI and JSON REST endpoints.
+- [x] Implement `hookcraft serve` and `hookcraft studio` commands.
 
----
-
-## 6. Implementation Roadmap
-
-### Phase 1: Git Plumbing & Staged File Scanner
-- [ ] Initialize Go module `github.com/alexandrmotologa/hookcraft`.
-- [ ] Implement `.git/hooks` installer creating lightweight shim scripts.
-- [ ] Implement `git diff --staged` parser extracting modified filenames and diff hunks.
-- [ ] Implement safe stashing of unstaged changes.
-
-### Phase 2: Concurrent Execution Engine
-- [ ] Implement parallel worker pool dispatching commands across staged files.
-- [ ] Replace `{staged_files}` placeholder dynamically in configured commands.
-- [ ] Capture exit codes and streaming output.
-- [ ] Benchmark execution speed (verify sub-100ms run times).
-
-### Phase 3: Built-in Secret Leak Shield
-- [ ] Implement Shannon entropy calculator for detecting randomized secrets.
-- [ ] Implement regex patterns for AWS (`AKIA...`), GitHub PAT (`ghp_...`), OpenAI (`sk-...`), and RSA private keys.
-- [ ] Abort commit with colorized terminal line highlights when secrets are found.
-
-### Phase 4: Interactive Fix Approver & TUI
-- [ ] Implement auto-formatting detector (`git status --porcelain` on staged files).
-- [ ] Implement interactive terminal prompt to auto-stage fixes with 1 keystroke (`[y/N]`).
-- [ ] Build terminal spinners and ANSI execution summary table.
-
-### Phase 5: Embedded React 19 Studio & Documentation
-- [ ] Scaffold Vite + React 19 dashboard in `web/`.
-- [ ] Build hook execution time benchmark charts.
-- [ ] Embed static assets directly into the Go executable via `//go:embed`.
-- [ ] Release single-binary executables for Linux, macOS, and Windows.
+### Phase 7: Verification, Documentation, and Release
+- [x] Run full test suite (`go test -v -race ./...`).
+- [x] Write `docs/ARCHITECTURE.md`, `docs/CONFIGURATION.md`, and `docs/SECRET_SHIELD.md`.
+- [x] Write humanized `README.md` without AI cliches, em dashes, or empty claims.
+- [x] Create Makefile and cross-compilation release scripts.

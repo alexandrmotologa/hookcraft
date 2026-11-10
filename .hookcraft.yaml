@@ -1,0 +1,37 @@
+# HookCraft Configuration
+# Documentation: https://github.com/alexandrmotologa/hookcraft
+
+version: 1
+
+settings:
+  concurrency: true           # Run independent hooks in parallel across CPU cores
+  auto_stage_fixes: true      # Automatically re-stage files modified by formatters
+  interactive_approval: false # Set true to show diff and ask [y/N] before staging fixes
+  block_secret_leaks: true    # Block commits containing API keys, private keys, or high entropy tokens
+  entropy_threshold: 3.8      # Shannon entropy threshold for secret detection (3.5 - 4.5)
+  timeout_seconds: 30         # Default command timeout
+  stash_unstaged: true        # Stash unstaged changes during hook execution to avoid dirty leaks
+  fail_fast: false            # Immediately stop all hooks on first failure
+
+hooks:
+  pre-commit:
+    - name: "Secret Leak Shield"
+      type: "builtin:secret_shield"
+      action: "block"
+
+    - name: "Go Format"
+      glob: "*.go"
+      run: "gofmt -w {staged_files}"
+      stage_fixed: true
+
+    - name: "Go Vet"
+      glob: "*.go"
+      run: "go vet ./..."
+
+  commit-msg:
+    - name: "Conventional Commits"
+      type: "builtin:conventional_commits"
+
+  pre-push:
+    - name: "Go Tests"
+      run: "go test -short ./..."

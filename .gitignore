@@ -1,20 +1,20 @@
 # Binaries
 bin/
-dist/
+/dist/
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
-hookcraft
+/hookcraft
 
 # Dependencies
 node_modules/
 vendor/
 
-# Web build output
-web/dist/
+# Web build temporary cache
 web/.vite/
+*.tsbuildinfo
 
 # IDE & OS
 .idea/
