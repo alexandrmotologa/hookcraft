@@ -56,7 +56,7 @@ func main() {
 		statusCommand(out, args)
 	case "serve", "studio":
 		serveDashboardCommand(out, args)
-	case "version", "-v", "--version":
+	case "version", "-v", "-V", "--version":
 		fmt.Printf("hookcraft v%s (%s)\n", Version, BuildDate)
 	case "help", "-h", "--help":
 		printUsage()

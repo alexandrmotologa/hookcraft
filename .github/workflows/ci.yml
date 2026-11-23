@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
     branches: [main]
 
@@ -31,6 +32,14 @@ jobs:
 
       - name: Run unit tests with race detector
         run: go test -v -race ./...
+
+      - name: Verify CLI Version & Help Flags
+        run: |
+          go run ./cmd/hookcraft --version
+          go run ./cmd/hookcraft -v
+          go run ./cmd/hookcraft -V
+          go run ./cmd/hookcraft version
+          go run ./cmd/hookcraft --help
 
   cross-compile:
     name: Cross Compilation

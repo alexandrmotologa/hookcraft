@@ -10,6 +10,8 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/alexandrmotologa/hookcraft/actions/workflows/ci.yml"><img src="https://github.com/alexandrmotologa/hookcraft/actions/workflows/ci.yml/badge.svg" alt="CI Status"></a>
+  <a href="https://github.com/alexandrmotologa/hookcraft/releases"><img src="https://img.shields.io/github/v/release/alexandrmotologa/hookcraft?color=blue" alt="Release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
   <a href="https://go.dev/"><img src="https://img.shields.io/badge/Go-1.23+-00ADD8?logo=go" alt="Go Version"></a>
   <a href="https://react.dev/"><img src="https://img.shields.io/badge/React-19.0-61DAFB?logo=react" alt="React 19"></a>
